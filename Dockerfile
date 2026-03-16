@@ -1,9 +1,9 @@
-FROM node:14
+FROM node:18
 
 # Set the working directory in the container
 WORKDIR /app
 
-RUN apt update -y && apt install -y openjdk-11-jdk bash
+RUN apt-get update -y && apt-get install -y openjdk-11-jdk bash && apt-get clean
 
 RUN npm install -g firebase-tools@11
 
@@ -19,7 +19,7 @@ COPY package*.json ./
 COPY ./functions/package*.json ./functions/
 
 # Install the project dependencies
-RUN npm install
+RUN npm install --legacy-peer-deps
 RUN cd functions && npm install && cd ..
 
 # Copy the entire project directory to the container
@@ -31,13 +31,15 @@ EXPOSE 4000
 EXPOSE 5000
 EXPOSE 5001
 EXPOSE 8080
-EXPOSE 9000
 EXPOSE 8085
+EXPOSE 9000
+EXPOSE 9099
 EXPOSE 9199
 EXPOSE 4400
 
-RUN mkdir -p scripts
-RUN echo '#!/bin/sh \nfirebase emulators:start --import=testdata --project demo-sampark &\nsleep 10\nnpm run dev --host &\nwait' > ./scripts/entrypoint.sh 
+RUN mkdir -p scripts && \
+    printf '#!/bin/bash\nfirebase emulators:start --import=testdata --project demo-codelabz &\nsleep 15\nnpm run dev -- --host 0.0.0.0\nwait' \
+    > ./scripts/entrypoint.sh
 RUN chmod +x ./scripts/entrypoint.sh
 
 CMD ["./scripts/entrypoint.sh"]
