@@ -21,6 +21,47 @@ import Select from "react-select";
 import { common } from "@mui/material/colors";
 import CloseIcon from "@mui/icons-material/Close";
 
+interface Organization {
+  org_handle: string;
+  org_name: string;
+  permissions: number[];
+}
+
+interface FormValue {
+  title: string;
+  summary: string;
+  owner: string;
+  tags: string[];
+}
+
+interface NewTutorialProps {
+  viewModal: boolean;
+  onSidebarClick: () => void;
+  viewCallback?: () => void;
+  active?: boolean;
+}
+
+interface RootState {
+  tutorials: {
+    create: {
+      loading: boolean;
+      error: boolean;
+    };
+  };
+  firebase: {
+    profile: {
+      displayName: string;
+      handle: string;
+    };
+  };
+  profile: {
+    data: {
+      organizations: Organization[] | null;
+      isEmpty: boolean;
+    } | null;
+  };
+}
+
 const useStyles = makeStyles(theme => ({
   root: {
     display: "flex",
@@ -41,45 +82,34 @@ const useStyles = makeStyles(theme => ({
     marginBottom: "1rem"
   },
   chip: {
-    margin: theme.spacing(0.5)
+    margin: "0.5",
   },
   button: {
-    marginLeft: theme.spacing(1),
+    marginLeft: "1",
     padding: "0.4rem 0.4rem"
   }
 }));
 
-const NewTutorial = ({ viewModal, onSidebarClick, viewCallback, active }) => {
+const NewTutorial: React.FC<NewTutorialProps> = ({ viewModal, onSidebarClick, viewCallback, active }) => {
   const firebase = useFirebase();
   const firestore = useFirestore();
   const dispatch = useDispatch();
   const history = useHistory();
-  const [visible, setVisible] = useState(false);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(false);
-  const [tags, setTags] = useState([]);
-  const [newTag, setNewTag] = useState("");
-  const [formValue, setformValue] = useState({
+
+  const [visible, setVisible] = useState<boolean>(false);
+  const [loading, setLoading] = useState<boolean>(false);
+  const [error, setError] = useState<boolean>(false);
+  const [tags, setTags] = useState<string[]>([]);
+  const [newTag, setNewTag] = useState<string>("");
+  const [formValue, setformValue] = useState<FormValue>({
     title: "",
     summary: "",
     owner: "",
     tags: []
   });
 
-  const loadingProp = useSelector(
-    ({
-      tutorials: {
-        create: { loading }
-      }
-    }) => loading
-  );
-  const errorProp = useSelector(
-    ({
-      tutorials: {
-        create: { error }
-      }
-    }) => error
-  );
+  const loadingProp = useSelector((state: RootState) => state.tutorials.create.loading);
+  const errorProp = useSelector((state: RootState) => state.tutorials.create.error);
 
   useEffect(() => {
     setLoading(loadingProp);
@@ -96,8 +126,7 @@ const NewTutorial = ({ viewModal, onSidebarClick, viewCallback, active }) => {
     }));
   }, [tags]);
 
-
-  const profileState = useSelector(state => state.profile.data);
+  const profileState = useSelector((state: RootState) => state.profile.data);
   
 const { organizations, isEmpty } = profileState || { organizations: null, isEmpty: false };
 
@@ -109,30 +138,22 @@ useEffect(() => {
   }
 }, [firestore, firebase, dispatch, organizations, isEmpty]);
 
-  const displayName = useSelector(
-    ({
-      firebase: {
-        profile: { displayName }
-      }
-    }) => displayName
-  );
+  const displayName = useSelector((state: RootState) => state.firebase.profile);
 
-  //This name should be replaced by displayName when implementing backend
-  const sampleName = "User Name Here";
-  const allowOrgs = organizations && organizations.length > 0;
+  const userHandle = useSelector((state: RootState) => state.firebase.profile.handle);
 
-  const orgList =
-    allowOrgs > 0
-      ? organizations
-          .map((org, i) => {
-            if (org.permissions.includes(3) || org.permissions.includes(2)) {
-              return org;
-            } else {
-              return null;
-            }
-          })
-          .filter(Boolean)
-      : null;
+  const allowOrgs: boolean = !!(organizations && organizations.length > 0);
+
+  const orgList: Organization[] = allowOrgs
+    ? organizations!
+        .map((org: Organization) => {
+          if (org.permissions.includes(3) || org.permissions.includes(2)) {
+            return org;
+          }
+          return null;
+        })
+        .filter((org): org is Organization => org !== null)
+    : [];
 
   useEffect(() => {
     setTags([]);
@@ -146,46 +167,45 @@ useEffect(() => {
     setVisible(viewModal);
   }, [viewModal]);
 
-  const onSubmit = formData => {
+  const onSubmit = (formData: React.MouseEvent): void => {
     formData.preventDefault();
     const tutorialData = {
       ...formValue,
+      owner: formValue.owner || userHandle,
       created_by: userHandle,
       is_org: userHandle !== formValue.owner,
       completed: false
     };
-    console.log(tutorialData);
     createTutorial(tutorialData)(firebase, firestore, dispatch, history);
   };
 
-  const onOwnerChange = value => {
+  const onOwnerChange = (value: string): void => {
     setformValue(prev => ({
       ...prev,
       owner: value
     }));
   };
 
-  const handleChange = e => {
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>): void => {
     const { name, value } = e.target;
-
     setformValue(prev => ({
       ...prev,
       [name]: value
     }));
   };
 
-  const handleAddTag = () => {
+  const handleAddTag = (): void => {
     if (newTag.trim() !== "") {
       setTags([...tags, newTag.trim()]);
       setNewTag("");
     }
   };
 
-  const handleDeleteTag = tagToDelete => {
+  const handleDeleteTag = (tagToDelete: string): void => {
     setTags(tags.filter(tag => tag !== tagToDelete));
   };
 
-  const handleKeyDown = e => {
+  const handleKeyDown = (e: React.KeyboardEvent): void => {
     if (e.key === "Enter") {
       e.preventDefault();
       handleAddTag();
@@ -193,6 +213,7 @@ useEffect(() => {
   };
 
   const classes = useStyles();
+
   return (
     <Modal
       open={visible}
@@ -217,26 +238,24 @@ useEffect(() => {
         }}
       >
         {error && (
-          <Alert message={""} type="error" closable="true" className="mb-24">
-            description={"Tutorial Creation Failed"}
+          <Alert severity="error" className="mb-24">
+            Tutorial Creation Failed
           </Alert>
         )}
+
         <Typography variant="h5">Create a Tutorial</Typography>
-        <Box
-          sx={{
-            py: 2,
-            width: "50%"
-          }}
-        >
+
+        <Box sx={{ py: 2, width: "50%" }}>
           <Typography>
             <Select
-              options={organizations?.map(org => ({
+              options={orgList.map((org: Organization) => ({
                 value: org.org_handle,
                 label: org.org_name
               }))}
               onChange={data => {
-                onOwnerChange(data.value);
+                if (data) onOwnerChange(data.value);
               }}
+              placeholder="Select Organisation"
               id="orgSelect"
             />
           </Typography>
@@ -244,9 +263,6 @@ useEffect(() => {
 
         <form id="tutorialNewForm">
           <TextField
-            prefix={
-              <AppstoreAddOutlined style={{ color: "rgba(0,0,0,.25)" }} />
-            }
             placeholder="Title of the Tutorial"
             autoComplete="title"
             name="title"
@@ -255,13 +271,10 @@ useEffect(() => {
             data-testId="newTutorial_title"
             id="newTutorialTitle"
             style={{ marginBottom: "2rem" }}
-            onChange={e => handleChange(e)}
+            onChange={e => handleChange(e as React.ChangeEvent<HTMLInputElement>)}
           />
 
           <TextField
-            prefix={
-              <AppstoreAddOutlined style={{ color: "rgba(0,0,0,.25)" }} />
-            }
             fullWidth
             variant="outlined"
             name="summary"
@@ -269,7 +282,7 @@ useEffect(() => {
             autoComplete="summary"
             id="newTutorialSummary"
             data-testId="newTutorial_summary"
-            onChange={e => handleChange(e)}
+            onChange={e => handleChange(e as React.ChangeEvent<HTMLInputElement>)}
             style={{ marginBottom: "2rem" }}
           />
 
@@ -291,7 +304,7 @@ useEffect(() => {
           </Button>
 
           <div className={classes.tagsContainer}>
-            {tags.map((tag, index) => (
+            {tags.map((tag: string, index: number) => (
               <Chip
                 key={index}
                 label={tag}
@@ -333,20 +346,16 @@ useEffect(() => {
               </Button>
               <Button
                 key="submit"
-                type="primary"
+                type="submit"
                 variant="contained"
                 color="secondary"
-                htmlType="submit"
-                loading={loading}
                 onClick={e => onSubmit(e)}
                 data-testid="newTutorialSubmit"
                 sx={{
                   bgcolor: "#03AAFA",
                   borderRadius: "30px",
                   color: common.white,
-                  "&:hover": {
-                    bgcolor: "#03AAFA"
-                  }
+                  "&:hover": { bgcolor: "#03AAFA" }
                 }}
                 disabled={
                   formValue.title === "" ||
